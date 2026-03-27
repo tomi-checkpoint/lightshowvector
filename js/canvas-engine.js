@@ -2,6 +2,7 @@ import { MirrorSystem } from './mirror.js';
 import { ColorSystem } from './color.js';
 import { UndoStack } from './undo.js';
 import { createStroke, STROKE_CLASSES } from './strokes/stroke-registry.js';
+import { StrokeHistory, exportSVGBlob } from './svg-export.js';
 
 export class CanvasEngine {
   constructor(canvas) {
@@ -13,6 +14,7 @@ export class CanvasEngine {
     this.mirrorSystem = new MirrorSystem();
     this.colorSystem = new ColorSystem();
     this.undoStack = new UndoStack(this.ctx);
+    this.strokeHistory = new StrokeHistory();
 
     this.lineWidth = 12;
     this.lineCap = 'round';
@@ -79,13 +81,17 @@ export class CanvasEngine {
     this._isDrawing = true;
     this._strokeLength = 0;
     this._embossMinX = this._embossMinY = this._embossMaxX = this._embossMaxY = null;
-    this.undoStack.save();
+    this.undoStack.save(this.strokeHistory.snapshot());
     this.colorSystem.onNewStroke();
     this.mirrorSystem.randomizeCenter();
     this._applyCtxState();
 
     const points = this.mirrorSystem.getTransformedPoints(x, y, this.canvas.width, this.canvas.height);
     this._prevPoints = points;
+
+    // Record stroke start — for Random stroke, record the delegate's name
+    const strokeName = this.activeStroke.delegateName || this.activeStroke.name;
+    this.strokeHistory.addStrokeStart(strokeName, this.lineWidth, this.lineCap, this._compositeOp);
 
     for (const p of points) {
       this.activeStroke.onStart(this.ctx, p.x, p.y, pressure);
@@ -115,6 +121,9 @@ export class CanvasEngine {
       this._strokeLength += Math.sqrt(dx * dx + dy * dy);
     }
 
+    // Record segment for SVG history
+    this.strokeHistory.addSegment(color, this._prevPoints || points, points, pressure);
+
     this._prevPoints = points;
 
     // Track bounding box for emboss
@@ -138,6 +147,7 @@ export class CanvasEngine {
       this.activeStroke.onEnd(this.ctx, p.x, p.y);
     }
     this._prevPoints = null;
+    this.strokeHistory.addStrokeEnd();
 
     // Apply emboss as post-process on the stroke bounding box
     if (this.filter === 'emboss' && this._embossMinX != null) {
@@ -154,16 +164,24 @@ export class CanvasEngine {
     this.ctx.fillStyle = this.colorSystem.getBgColorCSS();
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this._applyCtxState();
+    this.strokeHistory.addClear();
   }
 
   undo() {
-    this.undoStack.undo();
+    const histLen = this.undoStack.undo();
+    if (histLen !== false && histLen !== undefined) {
+      this.strokeHistory.restoreSnapshot(histLen);
+    }
   }
 
   exportPNG() {
     return new Promise(resolve => {
       this.canvas.toBlob(blob => resolve(blob), 'image/png');
     });
+  }
+
+  exportSVG() {
+    return exportSVGBlob(this, this.strokeHistory);
   }
 
   _applyCtxState() {

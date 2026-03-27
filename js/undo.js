@@ -5,9 +5,9 @@ export class UndoStack {
     this.maxSize = maxSize;
   }
 
-  save() {
+  save(historyLen) {
     const imageData = this.ctx.getImageData(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
-    this.stack.push(imageData);
+    this.stack.push({ imageData, historyLen });
     if (this.stack.length > this.maxSize) {
       this.stack.shift();
     }
@@ -15,9 +15,9 @@ export class UndoStack {
 
   undo() {
     if (this.stack.length === 0) return false;
-    const imageData = this.stack.pop();
-    this.ctx.putImageData(imageData, 0, 0);
-    return true;
+    const entry = this.stack.pop();
+    this.ctx.putImageData(entry.imageData, 0, 0);
+    return entry.historyLen;
   }
 
   clear() {

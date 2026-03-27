@@ -2,6 +2,7 @@ import { StrokeBase } from './stroke-base.js';
 
 export class StrokeRandom extends StrokeBase {
   get name() { return 'Random'; }
+  get delegateName() { return this._delegate?.name || 'Line'; }
 
   constructor(engine) {
     super(engine);

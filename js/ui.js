@@ -38,15 +38,23 @@ export class UI {
       engine.undo();
     });
 
-    // Save PNG
-    document.getElementById('btn-save').addEventListener('click', async () => {
+    // Save — show format choice dialog
+    document.getElementById('btn-save').addEventListener('click', () => {
+      this._showDialog('save-dialog');
+    });
+
+    // PNG download
+    document.getElementById('btn-save-png').addEventListener('click', async () => {
+      document.getElementById('save-dialog').classList.add('hidden');
       const blob = await engine.exportPNG();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `trippingfest-${Date.now()}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
+      this._downloadBlob(blob, `lightshow-${Date.now()}.png`);
+    });
+
+    // SVG download
+    document.getElementById('btn-save-svg').addEventListener('click', () => {
+      document.getElementById('save-dialog').classList.add('hidden');
+      const blob = engine.exportSVG();
+      this._downloadBlob(blob, `lightshow-${Date.now()}.svg`);
     });
 
     // Record toggle
@@ -478,6 +486,15 @@ export class UI {
     if (this.recorder.recording) {
       this.recorder.recordMove(x, y, pressure);
     }
+  }
+
+  _downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   _rgbToHex(c) {
