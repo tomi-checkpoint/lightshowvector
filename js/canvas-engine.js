@@ -63,12 +63,20 @@ export class CanvasEngine {
   setCompositeOp(op) {
     const map = {
       'SRC_OVER': 'source-over',
-      'XOR': 'xor',
+      'DARKEN': 'darken',
+      'LIGHTEN': 'lighten',
       'MULTIPLY': 'multiply',
       'SCREEN': 'screen',
+      'MASK_ALPHA': 'source-atop',
+      'MASK_BG': 'destination-in',
+      'MASK_INV_BG': 'destination-out',
+      'MASK_FG': 'source-in',
+      'DRAW_IN_BG': 'destination-over',
+      'XOR': 'xor',
       'ADD': 'lighter',
     };
     this._compositeOp = map[op] || 'source-over';
+    this._compositeOpKey = op;
     this.ctx.globalCompositeOperation = this._compositeOp;
   }
 

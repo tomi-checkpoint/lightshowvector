@@ -370,6 +370,41 @@ export class UI {
     offLabel.appendChild(document.createTextNode(' Off-Center Mirroring'));
     mirrorOpts.appendChild(offLabel);
 
+    // Blend mode
+    const blendCtrl = document.getElementById('blend-mode-control');
+    blendCtrl.innerHTML = '';
+    const blendLabel = document.createElement('label');
+    blendLabel.textContent = 'Blend Mode: ';
+    const blendSelect = document.createElement('select');
+    blendSelect.style.cssText = 'background:#444;color:#fff;border:1px solid #666;border-radius:4px;padding:4px;font-size:14px';
+    const blendModes = [
+      { key: 'SRC_OVER', label: 'Normal' },
+      { key: 'DARKEN', label: 'Darken' },
+      { key: 'LIGHTEN', label: 'Lighten' },
+      { key: 'MULTIPLY', label: 'Multiply' },
+      { key: 'SCREEN', label: 'Screen' },
+      { key: 'MASK_ALPHA', label: 'Mask [Alpha Mix]' },
+      { key: 'MASK_BG', label: 'Mask [Background]' },
+      { key: 'MASK_INV_BG', label: 'Mask [Inverted Background]' },
+      { key: 'MASK_FG', label: 'Mask [Foreground]' },
+      { key: 'DRAW_IN_BG', label: 'Draw in Background' },
+    ];
+    for (const mode of blendModes) {
+      const opt = document.createElement('option');
+      opt.value = mode.key;
+      opt.textContent = mode.label;
+      if (mode.key === (this.engine._compositeOpKey || 'SRC_OVER')) opt.selected = true;
+      blendSelect.appendChild(opt);
+    }
+    blendSelect.addEventListener('change', () => {
+      this.engine.setCompositeOp(blendSelect.value);
+      if (this.recorder.recording) {
+        this.recorder.recordStateChange('colorMix', blendSelect.value);
+      }
+    });
+    blendLabel.appendChild(blendSelect);
+    blendCtrl.appendChild(blendLabel);
+
     // Transparency
     transpCtrl.innerHTML = '';
     const tLabel = document.createElement('label');

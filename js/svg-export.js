@@ -330,8 +330,17 @@ function mapCompositeOp(op) {
   switch (op) {
     case 'multiply': return 'multiply';
     case 'screen': return 'screen';
+    case 'darken': return 'darken';
+    case 'lighten': return 'lighten';
     case 'lighter': return 'lighten';
     case 'xor': return 'difference';
+    // Porter-Duff mask modes have no SVG mix-blend-mode equivalent
+    case 'source-atop':
+    case 'destination-in':
+    case 'destination-out':
+    case 'source-in':
+    case 'destination-over':
+      return null;
     default: return null; // source-over = no blend mode
   }
 }

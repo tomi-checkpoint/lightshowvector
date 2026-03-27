@@ -211,7 +211,7 @@ export class RecordingRecorder {
     this.lines.push(`p,${engine.activeStroke.name}`);
     this.lines.push(`drawingMode,${engine.drawingMode}`);
     this.lines.push(`lineCap,${engine.lineCap}`);
-    this.lines.push(`colorMix,SRC_OVER`);
+    this.lines.push(`colorMix,${engine._compositeOpKey || 'SRC_OVER'}`);
     this.lines.push(`filter,${engine.filter}`);
     this.lines.push(`screenWH,${engine.canvas.width},${engine.canvas.height}`);
     this.lines.push(`width,${engine.lineWidth}`);
