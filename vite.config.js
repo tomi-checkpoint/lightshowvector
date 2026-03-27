@@ -1,4 +1,4 @@
 export default {
-  base: '/lightshowvector/',
+  base: '/',
   build: { outDir: 'dist' }
 };
