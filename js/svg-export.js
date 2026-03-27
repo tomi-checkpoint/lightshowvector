@@ -80,23 +80,22 @@ class SVGContext {
   }
 
   arc(x, y, radius, startAngle, endAngle, ccw) {
-    // Check if it's a full circle (all current usage is full circle)
     const range = Math.abs(endAngle - startAngle);
-    if (range >= Math.PI * 1.999) {
-      const p = this._transform(x, y);
-      const m = this._currentMatrix();
-      const scaledR = radius * Math.sqrt(Math.abs(m.a * m.d - m.b * m.c));
-      this.elements.push(
-        `<circle cx="${r(p.x)}" cy="${r(p.y)}" r="${r(scaledR)}" ` +
-        `fill="${this.fillStyle}" stroke="${this.strokeStyle}" ` +
-        `stroke-width="${this.lineWidth}"/>`
-      );
-      return;
-    }
-    // Partial arc — convert to SVG arc path
     const m = this._currentMatrix();
     const scale = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c));
     const sr = radius * scale;
+
+    if (range >= Math.PI * 1.999) {
+      // Full circle — use two half-arc SVG commands (SVG can't do a full circle in one arc)
+      const p = this._transform(x, y);
+      const top = { x: p.x, y: p.y - sr };
+      const bot = { x: p.x, y: p.y + sr };
+      this._pathData += `M${r(top.x)} ${r(top.y)}`;
+      this._pathData += `A${r(sr)} ${r(sr)} 0 1 1 ${r(bot.x)} ${r(bot.y)}`;
+      this._pathData += `A${r(sr)} ${r(sr)} 0 1 1 ${r(top.x)} ${r(top.y)}`;
+      return;
+    }
+    // Partial arc — convert to SVG arc path
     const sp = this._transform(x + radius * Math.cos(startAngle), y + radius * Math.sin(startAngle));
     const ep = this._transform(x + radius * Math.cos(endAngle), y + radius * Math.sin(endAngle));
     const largeArc = range > Math.PI ? 1 : 0;
@@ -105,18 +104,41 @@ class SVGContext {
   }
 
   ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle, ccw) {
-    const p = this._transform(x, y);
+    const range = Math.abs(endAngle - startAngle);
     const m = this._currentMatrix();
     const rot = rotation + Math.atan2(m.b, m.a);
     const scale = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c));
     const rx = radiusX * scale;
     const ry = radiusY * scale;
-    this.elements.push(
-      `<ellipse cx="${r(p.x)}" cy="${r(p.y)}" rx="${r(rx)}" ry="${r(ry)}" ` +
-      `transform="rotate(${r(rot * 180 / Math.PI)} ${r(p.x)} ${r(p.y)})" ` +
-      `fill="none" stroke="${this.strokeStyle}" ` +
-      `stroke-width="${this.lineWidth}" stroke-linecap="${this.lineCap}"/>`
-    );
+
+    if (range >= Math.PI * 1.999) {
+      // Full ellipse — two half-arc SVG commands
+      // Compute top/bottom points in rotated space
+      const p = this._transform(x, y);
+      const cosR = Math.cos(rot);
+      const sinR = Math.sin(rot);
+      // Point at angle 0 relative to ellipse center (right side)
+      const right = { x: p.x + rx * cosR, y: p.y + rx * sinR };
+      // Point at angle π relative to ellipse center (left side)
+      const left = { x: p.x - rx * cosR, y: p.y - rx * sinR };
+      const rotDeg = r(rot * 180 / Math.PI);
+      this._pathData += `M${r(right.x)} ${r(right.y)}`;
+      this._pathData += `A${r(rx)} ${r(ry)} ${rotDeg} 1 1 ${r(left.x)} ${r(left.y)}`;
+      this._pathData += `A${r(rx)} ${r(ry)} ${rotDeg} 1 1 ${r(right.x)} ${r(right.y)}`;
+      return;
+    }
+    // Partial ellipse arc
+    const p = this._transform(x, y);
+    const cosR = Math.cos(rot);
+    const sinR = Math.sin(rot);
+    const spLocal = { x: radiusX * Math.cos(startAngle), y: radiusY * Math.sin(startAngle) };
+    const epLocal = { x: radiusX * Math.cos(endAngle), y: radiusY * Math.sin(endAngle) };
+    const sp = { x: p.x + spLocal.x * cosR - spLocal.y * sinR, y: p.y + spLocal.x * sinR + spLocal.y * cosR };
+    const ep = { x: p.x + epLocal.x * cosR - epLocal.y * sinR, y: p.y + epLocal.x * sinR + epLocal.y * cosR };
+    const largeArc = range > Math.PI ? 1 : 0;
+    const sweep = ccw ? 0 : 1;
+    const rotDeg = r(rot * 180 / Math.PI);
+    this._pathData += `M${r(sp.x)} ${r(sp.y)}A${r(rx)} ${r(ry)} ${rotDeg} ${largeArc} ${sweep} ${r(ep.x)} ${r(ep.y)}`;
   }
 
   closePath() {
@@ -236,10 +258,6 @@ export function buildSVG(engine, history) {
   const svgParts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${r(w)}" height="${r(h)}" viewBox="0 0 ${cw} ${ch}">`
   ];
-
-  // Background
-  const bg = engine.colorSystem.getBgColorCSS();
-  svgParts.push(`<rect width="${cw}" height="${ch}" fill="${bg}"/>`);
 
   // Replay stroke history
   let currentStroke = null;
