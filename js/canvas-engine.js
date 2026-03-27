@@ -91,33 +91,69 @@ export class CanvasEngine {
   }
 
   _needsOffscreen() {
-    return ['destination-in', 'destination-out', 'source-in'].includes(this._compositeOp);
+    return ['destination-in', 'destination-out', 'source-in', 'source-atop'].includes(this._compositeOp);
   }
 
   _setupOffscreen() {
+    const w = this.canvas.width, h = this.canvas.height;
     if (!this._offscreenCanvas) {
       this._offscreenCanvas = document.createElement('canvas');
+      this._fgCanvas = document.createElement('canvas');
     }
-    this._offscreenCanvas.width = this.canvas.width;
-    this._offscreenCanvas.height = this.canvas.height;
+    this._offscreenCanvas.width = w;
+    this._offscreenCanvas.height = h;
     this._offscreenCtx = this._offscreenCanvas.getContext('2d', { willReadFrequently: true });
-    this._offscreenCtx.clearRect(0, 0, this._offscreenCanvas.width, this._offscreenCanvas.height);
+    this._offscreenCtx.clearRect(0, 0, w, h);
     // Copy rendering state to offscreen
     this._offscreenCtx.lineWidth = this.lineWidth;
     this._offscreenCtx.lineCap = this.lineCap;
     this._offscreenCtx.lineJoin = 'round';
-    this._offscreenCtx.globalCompositeOperation = 'source-over'; // Strokes render normally on offscreen
+    this._offscreenCtx.globalCompositeOperation = 'source-over';
     this._offscreenCtx.globalAlpha = 1;
+
+    // Build foreground-only layer (pre-stroke with background pixels made transparent)
+    this._fgCanvas.width = w;
+    this._fgCanvas.height = h;
+    const fgCtx = this._fgCanvas.getContext('2d', { willReadFrequently: true });
+    const fgData = new ImageData(
+      new Uint8ClampedArray(this._preStrokeImageData.data), w, h
+    );
+    const bg = this.colorSystem.bgColor;
+    const d = fgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] === bg.r && d[i+1] === bg.g && d[i+2] === bg.b) {
+        d[i+3] = 0; // Make background pixels transparent
+      }
+    }
+    fgCtx.putImageData(fgData, 0, 0);
   }
 
   _compositeOffscreen() {
-    // Restore pre-stroke state on main canvas
-    this.ctx.putImageData(this._preStrokeImageData, 0, 0);
-    // Composite the offscreen buffer onto main using the target blend mode
-    this.ctx.globalCompositeOperation = this._compositeOp;
-    this.ctx.drawImage(this._offscreenCanvas, 0, 0);
-    // Reset for next operation
+    const w = this.canvas.width, h = this.canvas.height;
+    const fgCtx = this._fgCanvas.getContext('2d');
+
+    // Re-create foreground layer fresh each frame (stroke accumulates on offscreen)
+    const fgData = new ImageData(
+      new Uint8ClampedArray(this._preStrokeImageData.data), w, h
+    );
+    const bg = this.colorSystem.bgColor;
+    const d = fgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] === bg.r && d[i+1] === bg.g && d[i+2] === bg.b) {
+        d[i+3] = 0;
+      }
+    }
+    fgCtx.putImageData(fgData, 0, 0);
+
+    // Apply the Porter-Duff operation: foreground vs stroke
+    fgCtx.globalCompositeOperation = this._compositeOp;
+    fgCtx.drawImage(this._offscreenCanvas, 0, 0);
+
+    // Rebuild main canvas: background + composited foreground
     this.ctx.globalCompositeOperation = 'source-over';
+    this.ctx.fillStyle = this.colorSystem.getBgColorCSS();
+    this.ctx.fillRect(0, 0, w, h);
+    this.ctx.drawImage(this._fgCanvas, 0, 0);
   }
 
   _getRenderCtx() {
