@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>TrippingFest</title>
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="drawing-canvas"></canvas>
+
+    <div id="toolbar">
+      <div id="toolbar-row">
+        <button id="btn-undo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 0 1 0 10H9"/><path d="M3 10l4-4M3 10l4 4"/></svg></button>
+        <button id="btn-clear" title="Clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <div id="width-display">
+          <input type="range" id="width-slider" min="1" max="100" value="12">
+        </div>
+        <button id="btn-pattern" title="Pattern"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/></svg></button>
+        <button id="btn-color" title="Color"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg></button>
+        <button id="btn-options" title="Mirror"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2,2"/><path d="M8 6l-4 6 4 6"/><path d="M16 6l4 6-4 6"/></svg></button>
+        <button id="btn-wildwalk" title="WildWalk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20Q8 4 12 12Q16 20 20 4"/></svg></button>
+        <span class="sep"></span>
+        <button id="btn-record" title="Record"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg></button>
+        <button id="btn-play" title="Play"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6,4 20,12 6,20" fill="currentColor"/></svg></button>
+        <button id="btn-save" title="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3M12 15l-4-4M12 15l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pattern-dialog" class="dialog hidden">
+    <div class="dialog-backdrop"></div>
+    <div class="dialog-sheet">
+      <div class="sheet-handle"></div>
+      <h3>Pattern</h3>
+      <div id="pattern-list" class="button-grid"></div>
+    </div>
+  </div>
+
+  <div id="color-dialog" class="dialog hidden">
+    <div class="dialog-backdrop"></div>
+    <div class="dialog-sheet">
+      <div class="sheet-handle"></div>
+      <h3>Color</h3>
+      <div id="color-mode-list" class="button-grid"></div>
+      <div id="color-controls"></div>
+    </div>
+  </div>
+
+  <div id="options-dialog" class="dialog hidden">
+    <div class="dialog-backdrop"></div>
+    <div class="dialog-sheet">
+      <div class="sheet-handle"></div>
+      <h3>Options</h3>
+      <div id="mirror-options"></div>
+      <div id="transparency-control"></div>
+    </div>
+  </div>
+
+  <div id="playback-dialog" class="dialog hidden">
+    <div class="dialog-backdrop"></div>
+    <div class="dialog-sheet">
+      <div class="sheet-handle"></div>
+      <h3>Recordings</h3>
+      <div id="recording-list" class="recording-grid"></div>
+    </div>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js');
+      });
+    }
+  </script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

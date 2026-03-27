@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh api:*)",
+      "Bash(gh run:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''CNAME: {d.get\\(\"\"cname\"\"\\)}\\\\nURL: {d.get\\(\"\"html_url\"\"\\)}''''\\)\")",
+      "WebFetch(domain:lightshow.gotomarketpro.eu)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "mcp__Control_Chrome__open_url",
+      "mcp__Control_Chrome__get_page_content",
+      "Bash(open -a \"Google Chrome\" \"http://lightshow.gotomarketpro.eu\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\" http://lightshow.gotomarketpro.eu)",
+      "Bash(curl -s http://lightshow.gotomarketpro.eu)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://lightshow.gotomarketpro.eu/assets/index-Cl96FQGu.js)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://lightshow.gotomarketpro.eu/assets/index-xMcj7enV.css)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://lightshow.gotomarketpro.eu/sw.js)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://lightshow.gotomarketpro.eu/manifest.json)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://lightshow.gotomarketpro.eu/assets/demos/Demo1.recording)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://lightshow.gotomarketpro.eu/assets/demos/Demo1.png)",
+      "Bash(gh repo:*)"
+    ]
+  }
+}
