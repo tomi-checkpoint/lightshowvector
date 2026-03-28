@@ -126,7 +126,8 @@ export class UI {
     const dialog = document.getElementById(id);
     dialog.classList.remove('hidden');
 
-    // Close on backdrop/overlay click (re-register each open to keep it simple)
+    const sheet = dialog.querySelector('.dialog-sheet');
+
     const handler = (e) => {
       if (e.target === dialog || e.target.classList.contains('dialog-backdrop')) {
         dialog.classList.add('hidden');
@@ -134,6 +135,52 @@ export class UI {
       }
     };
     dialog.addEventListener('click', handler);
+
+    // Swipe-down-to-close on the sheet
+    if (sheet && !sheet._swipeSetup) {
+      sheet._swipeSetup = true;
+      let startY = 0, currentY = 0, dragging = false;
+
+      sheet.addEventListener('touchstart', (e) => {
+        const touchY = e.touches[0].clientY;
+        const sheetRect = sheet.getBoundingClientRect();
+        const isAtTop = sheet.scrollTop <= 0;
+        const isInHandle = (touchY - sheetRect.top) < 40;
+        if (isInHandle || isAtTop) {
+          startY = touchY;
+          currentY = touchY;
+          dragging = true;
+          sheet.style.transition = 'none';
+        }
+      }, { passive: true });
+
+      sheet.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        currentY = e.touches[0].clientY;
+        const dy = currentY - startY;
+        if (dy > 0) {
+          sheet.style.transform = `translateY(${dy}px)`;
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      sheet.addEventListener('touchend', () => {
+        if (!dragging) return;
+        dragging = false;
+        const dy = currentY - startY;
+        sheet.style.transition = 'transform 0.2s ease-out';
+        if (dy > 80) {
+          sheet.style.transform = `translateY(100%)`;
+          setTimeout(() => {
+            dialog.classList.add('hidden');
+            sheet.style.transform = '';
+            sheet.style.transition = '';
+          }, 200);
+        } else {
+          sheet.style.transform = '';
+        }
+      }, { passive: true });
+    }
   }
 
   _buildPatternDialog() {
@@ -269,6 +316,26 @@ export class UI {
       controls.appendChild(container);
     }
 
+    if (cs.mode === 'gradient' || cs.mode === 'multiGradient') {
+      const lenLabel = document.createElement('label');
+      lenLabel.textContent = 'Gradient Length: ';
+      const lenInput = document.createElement('input');
+      lenInput.type = 'range';
+      lenInput.min = '50';
+      lenInput.max = '1000';
+      lenInput.step = '10';
+      lenInput.value = String(cs.gradientLength);
+      const lenVal = document.createElement('span');
+      lenVal.textContent = ` ${cs.gradientLength}px`;
+      lenInput.addEventListener('input', () => {
+        cs.gradientLength = parseInt(lenInput.value);
+        lenVal.textContent = ` ${cs.gradientLength}px`;
+      });
+      lenLabel.appendChild(lenInput);
+      lenLabel.appendChild(lenVal);
+      controls.appendChild(lenLabel);
+    }
+
     if (cs.mode === 'smoothRandom') {
       const label = document.createElement('label');
       label.textContent = 'Smoothness: ';
@@ -291,7 +358,10 @@ export class UI {
     bgInput.type = 'color';
     bgInput.value = this._rgbToHex(cs.bgColor);
     bgInput.addEventListener('input', () => {
-      cs.bgColor = this._hexToRgb(bgInput.value);
+      const oldBg = { ...cs.bgColor };
+      const newBg = this._hexToRgb(bgInput.value);
+      this.engine.recolorBackground(oldBg, newBg);
+      cs.bgColor = newBg;
     });
     bgLabel.appendChild(bgInput);
     controls.appendChild(bgLabel);
