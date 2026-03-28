@@ -80,7 +80,11 @@ export class CanvasEngine {
       'XOR': 'xor',
       'ADD': 'lighter',
     };
-    this._compositeOp = map[op] || 'source-over';
+    const newOp = map[op] || 'source-over';
+    if (this._maskBase && newOp !== this._compositeOp) {
+      this._clearMaskState();
+    }
+    this._compositeOp = newOp;
     this._compositeOpKey = op;
     this.ctx.globalCompositeOperation = this._compositeOp;
   }
@@ -94,6 +98,26 @@ export class CanvasEngine {
     return ['destination-in', 'destination-out', 'source-in', 'source-atop'].includes(this._compositeOp);
   }
 
+  _clearMaskState() {
+    this._maskBase = null;
+    this._maskAccumCanvas = null;
+    this._maskAccumCtx = null;
+  }
+
+  _extractForeground(imageData) {
+    const fgData = new ImageData(
+      new Uint8ClampedArray(imageData.data), imageData.width, imageData.height
+    );
+    const bg = this.colorSystem.bgColor;
+    const d = fgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] === bg.r && d[i+1] === bg.g && d[i+2] === bg.b) {
+        d[i+3] = 0;
+      }
+    }
+    return fgData;
+  }
+
   _setupOffscreen() {
     const w = this.canvas.width, h = this.canvas.height;
     if (!this._offscreenCanvas) {
@@ -104,6 +128,12 @@ export class CanvasEngine {
     this._offscreenCanvas.height = h;
     this._offscreenCtx = this._offscreenCanvas.getContext('2d', { willReadFrequently: true });
     this._offscreenCtx.clearRect(0, 0, w, h);
+
+    // Pre-populate offscreen with accumulated mask strokes from previous strokes
+    if (this._maskAccumCanvas) {
+      this._offscreenCtx.drawImage(this._maskAccumCanvas, 0, 0);
+    }
+
     // Copy rendering state to offscreen
     this._offscreenCtx.lineWidth = this.lineWidth;
     this._offscreenCtx.lineCap = this.lineCap;
@@ -111,41 +141,20 @@ export class CanvasEngine {
     this._offscreenCtx.globalCompositeOperation = 'source-over';
     this._offscreenCtx.globalAlpha = 1;
 
-    // Build foreground-only layer (pre-stroke with background pixels made transparent)
+    // Build foreground-only layer from the ORIGINAL content (mask base)
     this._fgCanvas.width = w;
     this._fgCanvas.height = h;
-    const fgCtx = this._fgCanvas.getContext('2d', { willReadFrequently: true });
-    const fgData = new ImageData(
-      new Uint8ClampedArray(this._preStrokeImageData.data), w, h
-    );
-    const bg = this.colorSystem.bgColor;
-    const d = fgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i] === bg.r && d[i+1] === bg.g && d[i+2] === bg.b) {
-        d[i+3] = 0; // Make background pixels transparent
-      }
-    }
-    fgCtx.putImageData(fgData, 0, 0);
   }
 
   _compositeOffscreen() {
     const w = this.canvas.width, h = this.canvas.height;
     const fgCtx = this._fgCanvas.getContext('2d');
 
-    // Re-create foreground layer fresh each frame (stroke accumulates on offscreen)
-    const fgData = new ImageData(
-      new Uint8ClampedArray(this._preStrokeImageData.data), w, h
-    );
-    const bg = this.colorSystem.bgColor;
-    const d = fgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i] === bg.r && d[i+1] === bg.g && d[i+2] === bg.b) {
-        d[i+3] = 0;
-      }
-    }
-    fgCtx.putImageData(fgData, 0, 0);
+    // Always composite against the ORIGINAL foreground (mask base), not the degraded canvas
+    const sourceData = this._maskBase || this._preStrokeImageData;
+    fgCtx.putImageData(this._extractForeground(sourceData), 0, 0);
 
-    // Apply the Porter-Duff operation: foreground vs stroke
+    // Apply the Porter-Duff operation: original foreground vs accumulated+current strokes
     fgCtx.globalCompositeOperation = this._compositeOp;
     fgCtx.drawImage(this._offscreenCanvas, 0, 0);
 
@@ -172,10 +181,23 @@ export class CanvasEngine {
     // Set up offscreen buffer for destructive Porter-Duff modes
     if (this._needsOffscreen()) {
       this._preStrokeImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+      // Save the original content on the FIRST mask stroke (persists across strokes)
+      if (!this._maskBase) {
+        this._maskBase = new ImageData(
+          new Uint8ClampedArray(this._preStrokeImageData.data),
+          this.canvas.width, this.canvas.height
+        );
+        this._maskAccumCanvas = document.createElement('canvas');
+        this._maskAccumCanvas.width = this.canvas.width;
+        this._maskAccumCanvas.height = this.canvas.height;
+        this._maskAccumCtx = this._maskAccumCanvas.getContext('2d');
+        this._maskAccumCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      }
       this._setupOffscreen();
     } else {
       this._offscreenCtx = null;
       this._preStrokeImageData = null;
+      if (this._maskBase) this._clearMaskState();
     }
 
     const renderCtx = this._getRenderCtx();
@@ -252,6 +274,10 @@ export class CanvasEngine {
     // Final composite for offscreen modes
     if (this._offscreenCtx) {
       this._compositeOffscreen();
+      if (this._maskAccumCtx) {
+        this._maskAccumCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this._maskAccumCtx.drawImage(this._offscreenCanvas, 0, 0);
+      }
       this._offscreenCtx = null;
       this._preStrokeImageData = null;
     }
@@ -271,6 +297,7 @@ export class CanvasEngine {
     this.ctx.fillStyle = this.colorSystem.getBgColorCSS();
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this._applyCtxState();
+    this._clearMaskState();
     this.strokeHistory.addClear();
   }
 
@@ -279,6 +306,7 @@ export class CanvasEngine {
     if (histLen !== false && histLen !== undefined) {
       this.strokeHistory.restoreSnapshot(histLen);
     }
+    this._clearMaskState();
   }
 
   exportPNG() {
