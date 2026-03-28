@@ -72,10 +72,10 @@ export class CanvasEngine {
       'LIGHTEN': 'lighten',
       'MULTIPLY': 'multiply',
       'SCREEN': 'screen',
-      'MASK_ALPHA': 'source-atop',
-      'MASK_BG': 'destination-in',
-      'MASK_INV_BG': 'destination-out',
-      'MASK_FG': 'source-in',
+      'MASK_ALPHA': 'xor',           // Android: PorterDuff.Mode.XOR
+      'MASK_BG': 'source-in',        // Android: PorterDuff.Mode.SRC_IN
+      'MASK_INV_BG': 'source-out',   // Android: PorterDuff.Mode.SRC_OUT
+      'MASK_FG': 'source-atop',      // Android: PorterDuff.Mode.SRC_ATOP
       'DRAW_IN_BG': 'destination-over',
       'XOR': 'xor',
       'ADD': 'lighter',
@@ -95,7 +95,7 @@ export class CanvasEngine {
   }
 
   _needsOffscreen() {
-    return ['destination-in', 'destination-out', 'source-in', 'source-atop'].includes(this._compositeOp);
+    return ['source-in', 'source-out', 'source-atop', 'xor', 'destination-over'].includes(this._compositeOp);
   }
 
   _clearMaskState() {
