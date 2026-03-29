@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lightshowvector-v3';
+const CACHE_NAME = 'lightshowvector-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

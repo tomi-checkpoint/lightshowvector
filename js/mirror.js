@@ -1,15 +1,24 @@
 export class MirrorSystem {
   constructor() {
-    this.vertical = false;     // reflect across vertical axis (left-right)
-    this.horizontal = false;   // reflect across horizontal axis (top-bottom)
-    this.diagonal1 = false;    // 45 degree
-    this.diagonal2 = false;    // 135 degree
-    this.polar = false;        // N-fold radial
-    this.sameColor = true;     // same color for all mirrors
-    this.polarFolds = 0;       // number of polar subdivisions
-    this.offCenter = false;    // randomize mirror center
-    this._offCenterX = 0.5;    // normalized offset (0-1)
+    this.vertical = false;       // reflect across vertical axis (left-right) = Android mirrorHorizontal
+    this.horizontal = false;     // reflect across horizontal axis (top-bottom) = Android mirrorVertical
+    this.diagonal1 = false;      // 180° point reflection = Android mirrorDiagonal
+    this.diagonal2 = false;      // 135 degree (web-only)
+    this.polar = false;          // N-fold radial
+    this.polarCentered = true;   // polar rotation around canvas center (vs touch point)
+    this.sameColor = true;       // same color for all mirrors
+    this.polarFolds = 0;         // number of polar subdivisions
+    this.offCenter = false;      // randomize mirror center
+    this._offCenterX = 0.5;     // normalized offset (0-1)
     this._offCenterY = 0.5;
+    this._initialX = 0;         // first touch point for non-centered polar
+    this._initialY = 0;
+  }
+
+  // Call at start of each stroke to set initial touch point
+  setInitialPoint(x, y) {
+    this._initialX = x;
+    this._initialY = y;
   }
 
   // Call on each new stroke to re-randomize the center
@@ -29,18 +38,19 @@ export class MirrorSystem {
     this._offCenterY = 0.5 + (Math.random() - 0.5) * 2 * spread;
   }
 
-  // Parse the options field from recording format:
-  // options,vMirror,hMirror,diag1,diag2,polar,sameColor,polarN,?,?,transparency
+  // Parse the options field from Android recording format:
+  // options,sameColorForAll,mirrorRegular,mirrorHorizontal,mirrorVertical,mirrorDiagonal,mirrorPolar,polarCount,polarCentered,transparencyEnabled,transparencyValue
   parseOptions(args) {
     const parts = args.split(',');
-    this.vertical = parts[0] === 'true';
-    this.horizontal = parts[1] === 'true';
-    this.diagonal1 = parts[2] === 'true';
-    this.diagonal2 = parts[3] === 'true';
-    this.polar = parts[4] === 'true';
-    this.sameColor = parts[5] === 'true';
+    this.sameColor = parts[0] === 'true';
+    // parts[1] = mirrorRegular (draw unmirrored stroke) — always true in our system
+    this.vertical = parts[2] === 'true';       // Android mirrorHorizontal = flip X = our vertical (left-right)
+    this.horizontal = parts[3] === 'true';     // Android mirrorVertical = flip Y = our horizontal (top-bottom)
+    this.diagonal1 = parts[4] === 'true';      // Android mirrorDiagonal = 180° point reflection
+    this.polar = parts[5] === 'true';
     this.polarFolds = parseInt(parts[6]) || 0;
-    // parts[7], parts[8] are unknown flags
+    this.polarCentered = parts[7] === 'true';
+    // parts[8] = transparencyEnabled
     const transparency = parseInt(parts[9]) || 0;
     return transparency;
   }
@@ -51,7 +61,10 @@ export class MirrorSystem {
     const points = [{ x, y }];
 
     if (this.polar && this.polarFolds > 0) {
-      return this._getPolarPoints(x, y, cx, cy);
+      // Polar center: canvas center if polarCentered, else first touch point
+      const pcx = this.polarCentered ? cx : this._initialX;
+      const pcy = this.polarCentered ? cy : this._initialY;
+      return this._getPolarPoints(x, y, pcx, pcy);
     }
 
     // Accumulate mirror reflections
@@ -75,10 +88,8 @@ export class MirrorSystem {
 
     if (this.diagonal1) {
       for (const p of points) {
-        // Reflect across y=x line through center
-        const dx = p.x - cx;
-        const dy = p.y - cy;
-        toAdd.push({ x: cx + dy, y: cy + dx });
+        // 180° point reflection through center (Android mirrorDiagonal: flip both X and Y)
+        toAdd.push({ x: 2 * cx - p.x, y: 2 * cy - p.y });
       }
     }
     points.push(...toAdd);

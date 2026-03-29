@@ -415,6 +415,18 @@ export class UI {
     polarLabel.appendChild(polarNum);
     mirrorOpts.appendChild(polarLabel);
 
+    // Polar centered checkbox
+    const centeredLabel = document.createElement('label');
+    const centeredCb = document.createElement('input');
+    centeredCb.type = 'checkbox';
+    centeredCb.checked = ms.polarCentered;
+    centeredCb.addEventListener('change', () => {
+      ms.polarCentered = centeredCb.checked;
+    });
+    centeredLabel.appendChild(centeredCb);
+    centeredLabel.appendChild(document.createTextNode(' Polar Centered'));
+    mirrorOpts.appendChild(centeredLabel);
+
     // Same color
     const sameLabel = document.createElement('label');
     const sameCb = document.createElement('input');

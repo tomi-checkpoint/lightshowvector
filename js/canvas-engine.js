@@ -174,6 +174,7 @@ export class CanvasEngine {
     this._embossMinX = this._embossMinY = this._embossMaxX = this._embossMaxY = null;
     this.undoStack.save(this.strokeHistory.snapshot());
     this.colorSystem.onNewStroke();
+    this.mirrorSystem.setInitialPoint(x, y);
     this.mirrorSystem.randomizeCenter();
     this._applyCtxState();
 
