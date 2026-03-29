@@ -125,7 +125,7 @@ export class CanvasEngine {
     this._offscreenCtx.lineWidth = this.lineWidth;
     this._offscreenCtx.lineCap = this.lineCap;
     this._offscreenCtx.lineJoin = 'round';
-    this._offscreenCtx.globalCompositeOperation = 'source-over';
+    this._offscreenCtx.globalCompositeOperation = 'destination-over';
     this._offscreenCtx.globalAlpha = 1;
 
     // Pre-extract foreground ONCE per stroke (doesn't change during a stroke)
