@@ -102,20 +102,7 @@ export class CanvasEngine {
     this._maskBase = null;
     this._maskAccumCanvas = null;
     this._maskAccumCtx = null;
-  }
-
-  _extractForeground(imageData) {
-    const fgData = new ImageData(
-      new Uint8ClampedArray(imageData.data), imageData.width, imageData.height
-    );
-    const bg = this.colorSystem.bgColor;
-    const d = fgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i] === bg.r && d[i+1] === bg.g && d[i+2] === bg.b) {
-        d[i+3] = 0;
-      }
-    }
-    return fgData;
+    this._cachedFgImageData = null;
   }
 
   _setupOffscreen() {
@@ -141,27 +128,38 @@ export class CanvasEngine {
     this._offscreenCtx.globalCompositeOperation = 'source-over';
     this._offscreenCtx.globalAlpha = 1;
 
-    // Build foreground-only layer from the ORIGINAL content (mask base)
+    // Pre-extract foreground ONCE per stroke (doesn't change during a stroke)
     this._fgCanvas.width = w;
     this._fgCanvas.height = h;
+    const sourceData = this._maskBase || this._preStrokeImageData;
+    if (!this._cachedFgImageData ||
+        this._cachedFgImageData.width !== w || this._cachedFgImageData.height !== h) {
+      this._cachedFgImageData = new ImageData(w, h);
+    }
+    const src = sourceData.data;
+    const dst = this._cachedFgImageData.data;
+    const bg = this.colorSystem.bgColor;
+    const bgPixel = ((255 << 24) | (bg.b << 16) | (bg.g << 8) | bg.r) >>> 0;
+    const src32 = new Uint32Array(src.buffer, src.byteOffset, src.length >> 2);
+    const dst32 = new Uint32Array(dst.buffer, dst.byteOffset, dst.length >> 2);
+    for (let i = 0, len = src32.length; i < len; i++) {
+      dst32[i] = src32[i] === bgPixel ? 0 : src32[i];
+    }
+    this._fgCtx = this._fgCanvas.getContext('2d');
   }
 
   _compositeOffscreen() {
-    const w = this.canvas.width, h = this.canvas.height;
-    const fgCtx = this._fgCanvas.getContext('2d');
-
-    // Always composite against the ORIGINAL foreground (mask base), not the degraded canvas
-    const sourceData = this._maskBase || this._preStrokeImageData;
-    fgCtx.putImageData(this._extractForeground(sourceData), 0, 0);
+    // Restore the pre-computed foreground (fast putImageData, no per-pixel work)
+    this._fgCtx.putImageData(this._cachedFgImageData, 0, 0);
 
     // Apply the Porter-Duff operation: original foreground vs accumulated+current strokes
-    fgCtx.globalCompositeOperation = this._compositeOp;
-    fgCtx.drawImage(this._offscreenCanvas, 0, 0);
+    this._fgCtx.globalCompositeOperation = this._compositeOp;
+    this._fgCtx.drawImage(this._offscreenCanvas, 0, 0);
 
     // Rebuild main canvas: background + composited foreground
     this.ctx.globalCompositeOperation = 'source-over';
-    this.ctx.fillStyle = this.colorSystem.getBgColorCSS();
-    this.ctx.fillRect(0, 0, w, h);
+    this.ctx.fillStyle = this._bgColorCSS || this.colorSystem.getBgColorCSS();
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.drawImage(this._fgCanvas, 0, 0);
   }
 
@@ -303,25 +301,18 @@ export class CanvasEngine {
   }
 
   recolorBackground(oldBg, newBg) {
-    const w = this.canvas.width, h = this.canvas.height;
-    const imageData = this.ctx.getImageData(0, 0, w, h);
-    const d = imageData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i] === oldBg.r && d[i+1] === oldBg.g && d[i+2] === oldBg.b && d[i+3] === 255) {
-        d[i] = newBg.r;
-        d[i+1] = newBg.g;
-        d[i+2] = newBg.b;
-      }
+    const oldPixel = ((255 << 24) | (oldBg.b << 16) | (oldBg.g << 8) | oldBg.r) >>> 0;
+    const newPixel = ((255 << 24) | (newBg.b << 16) | (newBg.g << 8) | newBg.r) >>> 0;
+    const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+    const d32 = new Uint32Array(imageData.data.buffer);
+    for (let i = 0, len = d32.length; i < len; i++) {
+      if (d32[i] === oldPixel) d32[i] = newPixel;
     }
     this.ctx.putImageData(imageData, 0, 0);
     if (this._maskBase) {
-      const md = this._maskBase.data;
-      for (let i = 0; i < md.length; i += 4) {
-        if (md[i] === oldBg.r && md[i+1] === oldBg.g && md[i+2] === oldBg.b && md[i+3] === 255) {
-          md[i] = newBg.r;
-          md[i+1] = newBg.g;
-          md[i+2] = newBg.b;
-        }
+      const m32 = new Uint32Array(this._maskBase.data.buffer);
+      for (let i = 0, len = m32.length; i < len; i++) {
+        if (m32[i] === oldPixel) m32[i] = newPixel;
       }
     }
   }
@@ -349,7 +340,8 @@ export class CanvasEngine {
     this.ctx.lineCap = this.lineCap;
     this.ctx.lineJoin = 'round';
     this.ctx.globalCompositeOperation = this._compositeOp;
-    this.ctx.globalAlpha = 1; // Alpha handled per-color
+    this.ctx.globalAlpha = 1;
+    this._bgColorCSS = this.colorSystem.getBgColorCSS();
   }
 
   _applyEmboss(bx, by, bw, bh) {
