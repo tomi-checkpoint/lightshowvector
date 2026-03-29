@@ -458,6 +458,7 @@ export class UI {
       { key: 'MASK_INV_BG', label: 'Mask [Inverted Background]' },
       { key: 'MASK_FG', label: 'Mask [Foreground]' },
       { key: 'DRAW_IN_BG', label: 'Draw in Background' },
+      { key: 'LIGHTEN_BG', label: 'Lighten Background' },
     ];
     for (const mode of blendModes) {
       const opt = document.createElement('option');
